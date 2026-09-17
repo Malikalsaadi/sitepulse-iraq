@@ -6,7 +6,19 @@ export default async (req) => {
   if (req.method !== 'GET') return new Response('Method not allowed', { status:405 });
   const configured = process.env.ANALYTICS_ADMIN_KEY;
   const supplied = req.headers.get('x-admin-key') || '';
-  if (!configured) return json({ ok:false, error:'admin_key_not_configured' }, 503);
+  if (!configured) {
+    const matchingKeys = Object.keys(process.env).filter(k => /ANALYTICS|ADMIN/i.test(k)).sort();
+    return json({
+      ok:false,
+      error:'admin_key_not_configured',
+      diagnostic:{
+        matchingEnvKeys: matchingKeys,
+        context: process.env.CONTEXT || '',
+        branch: process.env.BRANCH || '',
+        siteName: process.env.SITE_NAME || ''
+      }
+    }, 503);
+  }
   if (supplied !== configured) return json({ ok:false, error:'unauthorized' }, 401);
 
   try {
