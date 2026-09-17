@@ -2,3 +2,13 @@
   command = "mkdir -p dist && cp index.html analytics.html app.js styles.css feedback.js analytics.js analytics-admin.js daily-report.html daily-report.css daily-report.js daily-pdf-buttons.js dist/"
   publish = "dist"
   functions = "netlify/functions"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
