@@ -8,7 +8,14 @@
     try{
       const r=await fetch('/.netlify/functions/analytics-summary',{headers:{'X-Admin-Key':key}});
       const data=await r.json();
-      if(!r.ok)throw new Error(data.error||('HTTP '+r.status));
+      if(!r.ok){
+        if(data.error==='admin_key_not_configured'){
+          const d=data.diagnostic||{};
+          const keys=(d.matchingEnvKeys||[]).length?(d.matchingEnvKeys||[]).join(', '):'none';
+          throw new Error(`admin_key_not_configured|Context: ${d.context||'unknown'} | Branch: ${d.branch||'unknown'} | Similar env keys seen by Function: ${keys}`);
+        }
+        throw new Error(data.error||('HTTP '+r.status));
+      }
       sessionStorage.setItem('sp_admin_key',key);
       $('aVisitors').textContent=data.totals.visitors;
       $('aProjects').textContent=data.totals.projects;
@@ -21,7 +28,12 @@
       $('eventTotals').innerHTML=Object.entries(data.eventCounts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="item"><div class="itemtop"><b>${esc(k)}</b><strong>${v}</strong></div></div>`).join('')||'<p class="muted">No events yet.</p>';
       status.textContent=`Updated ${fmt(data.generatedAt)} • ${data.totals.identified} identified testers`;
     }catch(e){
-      console.error(e); status.textContent=e.message==='admin_key_not_configured'?'Admin key is not configured in Netlify yet.':e.message==='unauthorized'?'Wrong admin key.':'Could not load analytics: '+e.message;
+      console.error(e);
+      if(e.message.startsWith('admin_key_not_configured|')){
+        status.textContent='Netlify Function still cannot see ANALYTICS_ADMIN_KEY. '+e.message.split('|').slice(1).join('|');
+      }else{
+        status.textContent=e.message==='unauthorized'?'Wrong admin key.':'Could not load analytics: '+e.message;
+      }
     }
   };
 })();
