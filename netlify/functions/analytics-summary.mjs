@@ -1,25 +1,14 @@
 import { getStore } from '@netlify/blobs';
+import { createHash } from 'node:crypto';
 
+const ADMIN_KEY_SHA256 = '9c661d529237a4a076fc70a396bfbe6e9570f3604033c68f2ddf801f256e61f0';
 const json = (data, status=200) => Response.json(data, { status, headers:{'Cache-Control':'no-store'} });
+const hash = value => createHash('sha256').update(String(value || ''), 'utf8').digest('hex');
 
 export default async (req) => {
   if (req.method !== 'GET') return new Response('Method not allowed', { status:405 });
-  const configured = process.env.ANALYTICS_ADMIN_KEY;
   const supplied = req.headers.get('x-admin-key') || '';
-  if (!configured) {
-    const matchingKeys = Object.keys(process.env).filter(k => /ANALYTICS|ADMIN/i.test(k)).sort();
-    return json({
-      ok:false,
-      error:'admin_key_not_configured',
-      diagnostic:{
-        matchingEnvKeys: matchingKeys,
-        context: process.env.CONTEXT || '',
-        branch: process.env.BRANCH || '',
-        siteName: process.env.SITE_NAME || ''
-      }
-    }, 503);
-  }
-  if (supplied !== configured) return json({ ok:false, error:'unauthorized' }, 401);
+  if (hash(supplied) !== ADMIN_KEY_SHA256) return json({ ok:false, error:'unauthorized' }, 401);
 
   try {
     const store = getStore('sitepulse-analytics');
