@@ -18,7 +18,6 @@
       if(!res.ok)throw new Error('HTTP '+res.status);
       form.reset();
       if(status){status.textContent='Feedback sent successfully ✅ / تم إرسال ملاحظتك بنجاح ✅';status.style.display='block'}
-      if(window.sitepulseTrack)window.sitepulseTrack('feedback_submitted');
       window.dispatchEvent(new CustomEvent('sitepulse:feedback-sent'));
     }catch(err){
       console.error(err);
