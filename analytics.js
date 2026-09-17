@@ -9,7 +9,7 @@
   let source={}; try{source=JSON.parse(localStorage.getItem(SOURCE_KEY)||'{}')}catch{}
   const currentLang=()=>document.documentElement.lang||'en';
   const payload=event=>({event,visitorId,sessionId,testerName:profile.name||'',testerRole:profile.role||'',source:source.source||'',campaign:source.campaign||'',lang:currentLang()});
-  const track=(event)=>fetch('/.netlify/functions/analytics-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(event)),keepalive:true}).catch(()=>{});
+  const track=event=>fetch('/.netlify/functions/analytics-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(event)),keepalive:true}).catch(()=>{});
   window.sitepulseTrack=track;
 
   const getState=()=>{try{return JSON.parse(localStorage.getItem('sitepulse_v03')||'{}')}catch{return{}}};
@@ -25,10 +25,11 @@
   };
 
   const bind=()=>{
+    const versionNode=[...document.querySelectorAll('header small')].find(x=>x.textContent.includes('MVP v0.3.3')); if(versionNode)versionNode.innerHTML=versionNode.innerHTML.replace('MVP v0.3.3','MVP v0.3.4');
     addIdentityCard();
-    const p=document.getElementById('addProject'); if(p)p.addEventListener('click',()=>watchIncrease('projects',(getState().projects||[]).length,'project_created'));
-    const d=document.getElementById('saveDaily'); if(d)d.addEventListener('click',()=>watchIncrease('daily',(getState().daily||[]).length,'daily_report_created'));
-    const i=document.getElementById('addPunch'); if(i)i.addEventListener('click',()=>watchIncrease('punch',(getState().punch||[]).length,'punch_item_created',30));
+    const p=document.getElementById('addProject'); if(p)p.addEventListener('click',()=>watchIncrease('projects',(getState().projects||[]).length,'project_created'),true);
+    const d=document.getElementById('saveDaily'); if(d)d.addEventListener('click',()=>watchIncrease('daily',(getState().daily||[]).length,'daily_report_created'),true);
+    const i=document.getElementById('addPunch'); if(i)i.addEventListener('click',()=>watchIncrease('punch',(getState().punch||[]).length,'punch_item_created',30),true);
     const pdf=document.getElementById('printReport'); if(pdf)pdf.addEventListener('click',()=>track('pdf_exported'));
     const lang=document.getElementById('langBtn'); if(lang)lang.addEventListener('click',()=>setTimeout(()=>track('language_changed'),50));
     const backup=document.getElementById('backupBtn'); if(backup)backup.addEventListener('click',()=>track('backup_exported'));
