@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0f14"><title>SitePulse Analytics</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header><div class="top"><div><b class="brand">Site<span>Pulse</span> Analytics</b><small>Private beta dashboard</small></div><div class="actions"><a class="btn secondary" href="/">Back to SitePulse</a></div></div></header>
+<main>
+<section class="view active">
+  <article class="card"><p class="kicker">ADMIN</p><h1>Beta Usage Dashboard</h1><p class="muted">Shows anonymous usage events and optional tester names. It does not store project names, client names, report text, or photos.</p><div class="formgrid"><label>Admin key<input id="adminKey" type="password" autocomplete="current-password"></label></div><button id="loadAnalytics">Load analytics</button><p id="analyticsStatus" class="notice" style="display:none;margin-top:12px"></p></article>
+  <div class="stats"><article><strong id="aVisitors">—</strong><span>Unique visitors</span></article><article><strong id="aProjects">—</strong><span>Projects created</span></article><article><strong id="aPunch">—</strong><span>Punch items</span></article></div>
+  <div class="stats"><article><strong id="aReports">—</strong><span>Daily reports</span></article><article><strong id="aPdf">—</strong><span>PDF exports</span></article><article><strong id="aFeedback">—</strong><span>Feedback sent</span></article></div>
+  <article class="card"><h2>Visitors / Testers</h2><div class="preview"><div class="paper" style="min-height:0"><div id="visitorTable">Enter the admin key and load analytics.</div></div></div></article>
+  <article class="card"><h2>Event totals</h2><div id="eventTotals" class="list"></div></article>
+</section>
+</main><footer>SitePulse Iraq • Private beta analytics</footer><script src="analytics-admin.js"></script></body></html>
