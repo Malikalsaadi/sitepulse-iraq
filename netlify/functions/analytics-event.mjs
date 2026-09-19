@@ -3,7 +3,7 @@ import { getStore } from '@netlify/blobs';
 const ALLOWED = new Set([
   'app_open','project_created','daily_report_created','punch_item_created',
   'punch_item_closed','pdf_exported','language_changed','backup_exported',
-  'feedback_opened','feedback_submitted','tester_identified'
+  'feedback_opened','feedback_submitted','tester_identified','daily_pdf_opened'
 ]);
 
 const clean = (v, max=80) => typeof v === 'string' ? v.trim().slice(0,max) : '';
