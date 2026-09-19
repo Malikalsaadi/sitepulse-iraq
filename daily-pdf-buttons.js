@@ -6,7 +6,6 @@
 
   function openPdf(id){
     window.open('/daily-report.html?id='+encodeURIComponent(id),'_blank','noopener');
-    if(window.sitepulseTrack)window.sitepulseTrack('daily_pdf_opened');
   }
 
   function enhance(){
