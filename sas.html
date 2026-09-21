@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0f14">
+<title>SAS — Smart ATS Studio | SitePulse Iraq</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="sas.css">
+</head>
+<body>
+<header>
+  <div class="top">
+    <div><b class="brand">Site<span>Pulse</span> Iraq</b><small>SAS • Smart ATS Studio • Alpha</small></div>
+    <div class="actions">
+      <a class="btn secondary" href="/">← SitePulse</a>
+      <button class="secondary" id="sasLang">العربية</button>
+    </div>
+  </div>
+</header>
+
+<main class="sas-main">
+<section class="sas-hero">
+  <p class="kicker">SAS • SMART ATS STUDIO</p>
+  <h1 id="heroTitle">Build a professional, ATS-friendly CV</h1>
+  <p class="muted" id="heroSub">Create a CV from scratch or upload your old CV, check readability, improve it with AI, and export a clean PDF.</p>
+</section>
+
+<section class="grid two sas-workspace">
+  <div>
+    <article class="card">
+      <h2 id="uploadTitle">1. Start from an old CV</h2>
+      <p class="muted" id="uploadHelp">Upload PDF, DOCX or TXT. SAS extracts text locally in your browser for the ATS check.</p>
+      <input id="cvFile" type="file" accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      <div class="toolbar" style="margin-top:12px">
+        <button id="readCv">Read CV / قراءة السيرة</button>
+        <button class="secondary" id="clearImported">Clear</button>
+      </div>
+      <p id="fileStatus" class="notice" style="display:none;margin-top:12px"></p>
+      <label class="full" style="display:block;margin-top:12px">Extracted CV text / النص المستخرج
+        <textarea id="importedText" class="sas-bigtext" placeholder="Your extracted CV text will appear here..."></textarea>
+      </label>
+    </article>
+
+    <article class="card">
+      <h2 id="formTitle">2. Your CV information</h2>
+      <div class="formgrid">
+        <label>Full name / الاسم<input id="cvName"></label>
+        <label>Professional title / المسمى<input id="cvTitle" placeholder="Mechanical / Piping / Commissioning Supervisor"></label>
+        <label>Email<input id="cvEmail" type="email"></label>
+        <label>Phone / الهاتف<input id="cvPhone"></label>
+        <label>Location / الموقع<input id="cvLocation"></label>
+        <label>LinkedIn<input id="cvLinkedin"></label>
+        <label class="full">Professional summary / الملخص<textarea id="cvSummary"></textarea></label>
+        <label class="full">Experience / الخبرات<textarea id="cvExperience" class="sas-bigtext" placeholder="One role per block. Include company, title, dates and achievements."></textarea></label>
+        <label class="full">Education / التعليم<textarea id="cvEducation"></textarea></label>
+        <label class="full">Certifications / الشهادات<textarea id="cvCerts"></textarea></label>
+        <label class="full">Skills / المهارات<textarea id="cvSkills" placeholder="Piping, Commissioning, ASME B31.3, QA/QC..."></textarea></label>
+        <label class="full">Target job description (optional) / وصف الوظيفة المستهدفة<textarea id="jobDescription" placeholder="Paste the job description to improve keyword matching."></textarea></label>
+      </div>
+      <div class="toolbar">
+        <button id="buildCv">Build CV / إنشاء السيرة</button>
+        <button class="secondary" id="aiImprove">✨ AI Improve / تحسين بالذكاء الاصطناعي</button>
+      </div>
+      <p id="aiStatus" class="notice" style="display:none;margin-top:12px"></p>
+    </article>
+  </div>
+
+  <div>
+    <article class="card">
+      <div class="sas-score-head">
+        <div>
+          <p class="kicker">ATS READABILITY CHECK</p>
+          <h2 id="atsTitle">ATS Check</h2>
+        </div>
+        <div class="sas-score"><strong id="atsScore">—</strong><span>/100</span></div>
+      </div>
+      <div class="toolbar">
+        <button id="runAts">Run ATS Check / فحص ATS</button>
+      </div>
+      <p class="muted sas-disclaimer">Heuristic check only. No score can guarantee acceptance by every employer or ATS.</p>
+      <div id="atsResults" class="sas-results"><p class="muted">Upload a CV or fill your information, then run the check.</p></div>
+    </article>
+
+    <article class="card">
+      <div class="toolbar noprint">
+        <button id="printCv">Print / Save PDF</button>
+        <button class="secondary" id="copyCv">Copy text</button>
+      </div>
+      <div class="sas-preview-wrap">
+        <article id="cvPreview" class="sas-paper">
+          <div class="sas-empty">Your professional CV preview will appear here.</div>
+        </article>
+      </div>
+    </article>
+  </div>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module" id="pdfjsModule"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="sas.js"></script>
+</body></html>
