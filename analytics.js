@@ -9,7 +9,7 @@
   let source={}; try{source=JSON.parse(localStorage.getItem(SOURCE_KEY)||'{}')}catch{}
   const currentLang=()=>document.documentElement.lang||'en';
   const payload=event=>({event,visitorId,sessionId,testerName:profile.name||'',testerRole:profile.role||'',source:source.source||'',campaign:source.campaign||'',lang:currentLang()});
-  const track=event=>fetch('/.netlify/functions/analytics-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload(event)),keepalive:true}).catch(()=>{});
+  const SUPABASE_URL='https://pxqhkqgqvixopmxtoarv.supabase.co'; const SUPABASE_KEY='sb_publishable_VgKWgWVH8OxxjL41KFS6pw_wFolkVxW'; const track=event=>{const p=payload(event);return fetch(SUPABASE_URL+'/rest/v1/analytics_events',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'},body:JSON.stringify({event:p.event,visitor_id:p.visitorId,session_id:p.sessionId,tester_name:p.testerName,tester_role:p.testerRole,source:p.source,campaign:p.campaign,lang:p.lang}),keepalive:true}).catch(()=>{})};
   window.sitepulseTrack=track;
 
   const getState=()=>{try{return JSON.parse(localStorage.getItem('sitepulse_v03')||'{}')}catch{return{}}};
