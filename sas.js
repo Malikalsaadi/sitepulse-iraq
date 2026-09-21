@@ -116,7 +116,7 @@ async function aiImprove(){
   notice('aiStatus','AI is reviewing your CV...');
   $('aiImprove').disabled=true;
   try{
-    const r=await fetch('/.netlify/functions/cv-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const r=await fetch('/api/cv-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(data.error||'AI service is not configured yet.');
     const f=data.cv||{};
