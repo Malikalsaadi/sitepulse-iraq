@@ -156,6 +156,12 @@ function experienceHtml(exp){
   }).join('');
 }
 
+let atsTimer=null;
+function scheduleAts(){
+  clearTimeout(atsTimer);
+  atsTimer=setTimeout(runAts,180);
+}
+
 function buildPreview(data=gatherData()){
   const contact=[data.email,data.phone,data.location,data.linkedin].filter(Boolean).map(esc).join(' • ');
   const skills=(data.skills||[]).map(x=>'<span class="sas-skill">'+esc(x)+'</span>').join('');
@@ -171,44 +177,127 @@ function buildPreview(data=gatherData()){
     section(lang==='ar'?'الشهادات':'Certifications',certs?'<ul>'+certs+'</ul>':'')+
     section(lang==='ar'?'المهارات':'Core Skills',skills?'<div class="sas-pill-list">'+skills+'</div>':'')+
     section(lang==='ar'?'اللغات':'Languages',langs?'<div class="lang-list">'+langs+'</div>':'');
+  scheduleAts();
   return data;
+}
+
+function structuredCvText(d=gatherData()){
+  return [
+    d.name,d.title,d.email,d.phone,d.location,d.linkedin,
+    'Professional Summary',d.summary,
+    'Professional Experience',
+    ...d.experience.flatMap(e=>[e.role,e.company,e.project,e.from,e.current?'Present':e.to,...e.duties]),
+    'Education',...d.education,
+    'Certifications',...d.certifications,
+    'Skills',...d.skills,
+    'Languages',...d.languages.map(x=>x.language+' '+x.level)
+  ].filter(Boolean).join('\n');
 }
 
 function sourceText(){
   const d=gatherData();
-  return [
-    val('importedText'),'Professional Summary',d.summary,'Professional Experience',
-    ...d.experience.flatMap(e=>[e.role,e.company,e.project,e.from,e.to,...e.duties]),
-    'Education',...d.education,'Certifications',...d.certifications,'Skills',...d.skills,
-    'Languages',...d.languages.map(x=>x.language+' '+x.level),
-    d.email,d.phone,d.location,d.linkedin
-  ].filter(Boolean).join('\n');
+  const structured=structuredCvText(d).trim();
+  const hasStructured=!!(d.name||d.title||d.summary||d.experience.length||d.education.length||d.certifications.length||d.skills.length||d.languages.length);
+  return hasStructured?structured:val('importedText');
 }
 
 function keywordSet(s){return new Set(String(s||'').toLowerCase().match(/[a-z][a-z0-9+.#/-]{2,}|[\u0600-\u06ff]{3,}/g)||[])}
 function runAts(){
-  const text=sourceText(); if(!text.trim())return notice('aiStatus','Add CV information first.',true);
-  let score=100;const checks=[];const add=(ok,title,detail,penalty=0)=>{if(!ok)score-=penalty;checks.push({ok,title,detail})};
-  const words=text.split(/\s+/).filter(Boolean).length;
-  add(words>=250&&words<=1400,'Length',words+' words. '+(words<250?'Add more relevant professional detail.':words>1400?'Consider shortening the CV.':'Good working range.'),words<250?12:words>1400?8:0);
-  add(/@/.test(text),'Email','Include a visible professional email.',8);
-  add(/\+?\d[\d\s()-]{7,}/.test(text),'Phone','Include a parseable phone number.',6);
   const d=gatherData();
-  add(d.experience.length>0,'Experience','At least one structured experience entry is recommended.',12);
-  add(d.certifications.length>0,'Certifications','Certifications are separated and ATS-readable.',4);
-  add(d.skills.length>=5,'Skills','Use a focused technical skills section.',6);
-  add(d.languages.length>0,'Languages','Languages are structured clearly.',2);
+  const text=sourceText().trim();
+  if(!text){
+    $('atsScore').textContent='—';
+    $('atsResults').innerHTML='<p class="muted">Start filling the CV to see a live ATS score.</p>';
+    return;
+  }
+
+  let score=0;
+  const checks=[];
+  const add=(earned,max,title,detail)=>{
+    const safe=Math.max(0,Math.min(max,earned));
+    score+=safe;
+    checks.push({ok:safe>=max*.7,title,detail,points:Math.round(safe)+'/'+max});
+  };
+
+  const words=text.split(/\s+/).filter(Boolean).length;
+  const dutyList=d.experience.flatMap(e=>e.duties||[]);
+  const uniqueDuties=new Set(dutyList.map(x=>x.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').trim()));
+  const actionVerb=/^(supervis|coordinat|inspect|review|perform|manage|lead|monitor|verify|plan|implement|maintain|support|troubleshoot|prepare|ensure|conduct|execute|develop|control|organize|assess)/i;
+  const strongDuties=dutyList.filter(x=>x.split(/\s+/).length>=7 && actionVerb.test(x.trim())).length;
+
+  let contact=0;
+  if(d.email && /@/.test(d.email))contact+=4;
+  if(d.phone && /\+?\d[\d\s()-]{7,}/.test(d.phone))contact+=4;
+  if(d.location)contact+=2;
+  add(contact,10,'Contact details',contact===10?'Email, phone and location are complete.':'Complete email, phone and location for stronger parsing.');
+
+  add(d.title?5:0,5,'Professional title',d.title?'Clear professional title detected.':'Add a clear target professional title.');
+
+  const summaryWords=d.summary.split(/\s+/).filter(Boolean).length;
+  let summaryPts=0;
+  if(summaryWords>=25)summaryPts=5;
+  if(summaryWords>=40&&summaryWords<=120)summaryPts=10;
+  else if(summaryWords>120)summaryPts=7;
+  add(summaryPts,10,'Professional summary',summaryWords?summaryWords+' words in the summary. Aim for roughly 40–120 focused words.':'Add a concise professional summary.');
+
+  let expPts=0;
+  if(d.experience.length)expPts+=6;
+  if(d.experience.length){
+    const completeness=d.experience.map(e=>{
+      let p=0;
+      if(e.role)p+=1;
+      if(e.company)p+=1;
+      if(e.project)p+=.5;
+      if(e.from&&(e.to||e.current))p+=1;
+      if((e.duties||[]).length>=3)p+=1.5;
+      return p/5;
+    });
+    expPts+=Math.round((completeness.reduce((a,b)=>a+b,0)/completeness.length)*14);
+  }
+  add(expPts,20,'Experience structure',d.experience.length?d.experience.length+' structured role(s). Include title, company, dates and at least 3 duties per role.':'Add at least one structured experience entry.');
+
+  let dutyPts=0;
+  if(dutyList.length>=3)dutyPts=5;
+  if(dutyList.length>=6)dutyPts=9;
+  if(dutyList.length>=10)dutyPts=11;
+  const qualityRatio=dutyList.length?strongDuties/dutyList.length:0;
+  dutyPts+=Math.round(qualityRatio*4);
+  if(uniqueDuties.size<dutyList.length && dutyList.length)dutyPts=Math.max(0,dutyPts-2);
+  add(dutyPts,15,'Duties quality',dutyList.length?dutyList.length+' duties; '+strongDuties+' use strong action-led professional phrasing.':'Add concise responsibility/achievement bullets.');
+
+  let skillsPts=Math.min(10,Math.round(d.skills.length*1.25));
+  add(skillsPts,10,'Technical skills',d.skills.length+' skill(s). Around 8–12 relevant skills is a strong range.');
+
+  let backgroundPts=0;
+  if(d.education.length)backgroundPts+=4;
+  if(d.certifications.length)backgroundPts+=4;
+  add(backgroundPts,8,'Education & certifications',(d.education.length?'Education included. ':'Add education. ')+(d.certifications.length?'Certifications included.':'Add relevant certifications if applicable.'));
+
+  add(d.languages.length?4:0,4,'Languages',d.languages.length?d.languages.length+' language(s) listed with proficiency.':'Add languages and proficiency levels.');
+
+  let lengthPts=0;
+  if(words>=250&&words<=1000)lengthPts=8;
+  else if(words>=180&&words<250)lengthPts=5;
+  else if(words>1000&&words<=1400)lengthPts=5;
+  else if(words>=100&&words<180)lengthPts=3;
+  add(lengthPts,8,'CV length',words+' words in the current CV content.');
+
   const jd=val('jobDescription');
   if(jd){
-    const cv=keywordSet(text), job=keywordSet(jd);
-    const stop=new Set(['the','and','with','for','this','that','from','your','you','are','our','have','will','job','role','work','all','into','who','requirements','responsibilities']);
+    const cv=keywordSet(text),job=keywordSet(jd);
+    const stop=new Set(['the','and','with','for','this','that','from','your','you','are','our','have','will','job','role','work','all','into','who','requirements','responsibilities','experience','skills']);
     const keys=[...job].filter(k=>!stop.has(k)&&k.length>3);
     const hits=keys.filter(k=>cv.has(k));
-    const match=Math.round(Math.min(100,(keys.length?hits.length/keys.length:0)*175));
-    add(match>=45,'Job keyword match','Estimated keyword overlap: '+match+'%. AI generation can improve relevant wording without inventing experience.',match>=45?0:12);
-  }else checks.push({ok:true,title:'Job targeting',detail:'Paste a job description for keyword targeting.'});
-  score=Math.max(0,Math.min(100,score));$('atsScore').textContent=score;
-  $('atsResults').innerHTML=checks.map(c=>'<div class="sas-check '+(c.ok?'good':'warn')+'"><b>'+(c.ok?'✓ ':'⚠ ')+esc(c.title)+'</b><span class="muted">'+esc(c.detail)+'</span></div>').join('');
+    const match=keys.length?hits.length/keys.length:0;
+    const keywordPts=Math.round(Math.min(10,match*18));
+    add(keywordPts,10,'Target-job keywords','Estimated relevant keyword overlap: '+Math.round(match*100)+'%. Use only keywords supported by your real experience.');
+  }else{
+    add(5,10,'Target-job keywords','No job description supplied. Paste one to unlock the full 10 points for job targeting.');
+  }
+
+  score=Math.max(0,Math.min(100,Math.round(score)));
+  $('atsScore').textContent=score;
+  $('atsResults').innerHTML=checks.map(c=>'<div class="sas-check '+(c.ok?'good':'warn')+'"><b>'+(c.ok?'✓ ':'⚠ ')+esc(c.title)+' <span style="float:right">'+esc(c.points)+'</span></b><span class="muted">'+esc(c.detail)+'</span></div>').join('');
 }
 
 async function readPdf(file){
@@ -312,7 +401,7 @@ $('readCv').onclick=readFile;$('clearImported').onclick=()=>{$('importedText').v
 $('buildCv').onclick=()=>{buildPreview();runAts()};$('generateCv').onclick=generateCv;$('runAts').onclick=runAts;
 $('printCv').onclick=()=>{buildPreview();window.print()};$('copyCv').onclick=copyText;
 $('sasLang').onclick=()=>{lang=lang==='en'?'ar':'en';document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';$('sasLang').textContent=lang==='en'?'العربية':'English';buildPreview()};
-['cvName','cvTitle','cvEmail','cvPhone','cvLocation','cvLinkedin','cvSummary','cvEducation','cvSkills','jobDescription'].forEach(id=>$(id).addEventListener('input',()=>{clearTimeout(window.__sasTimer);window.__sasTimer=setTimeout(buildPreview,180)}));
+['cvName','cvTitle','cvEmail','cvPhone','cvLocation','cvLinkedin','cvSummary','cvEducation','cvSkills','jobDescription','importedText'].forEach(id=>$(id).addEventListener('input',()=>{clearTimeout(window.__sasTimer);window.__sasTimer=setTimeout(buildPreview,180)}));
 
 renderExperiences();renderCerts();renderLanguages();buildPreview();
 })();
