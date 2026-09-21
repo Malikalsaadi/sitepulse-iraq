@@ -230,62 +230,96 @@ function runAts(){
   const lower=text.toLowerCase();
 
   if(!hasStructured){
-    const hasEmail=/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text);
-    const hasPhone=/\+?\d[\d\s().-]{7,}\d/.test(text);
-    const locationHit=/\b(basra|baghdad|iraq|dubai|abu dhabi|doha|qatar|kuwait|saudi|riyadh|oman|muscat|البصرة|بغداد|العراق)\b/i.test(text);
-    let contact=(hasEmail?4:0)+(hasPhone?4:0)+(locationHit?2:0);
-    add(contact,10,'Contact details',
-      contact>=8?'Email and phone are readable in the uploaded CV.':'Make email, phone and location clearly visible in plain text.');
+    const norm=s=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+    const unique=(arr)=>[...new Set(arr.map(x=>norm(x)).filter(Boolean))];
 
-    const titleHit=/\b(supervisor|engineer|inspector|technician|coordinator|manager|specialist|foreman|lead|mechanical|piping|welding|commissioning|qa\/?qc|quality)\b/i.test(text.slice(0,1200));
-    add(titleHit?5:0,5,'Professional title',
-      titleHit?'A recognizable professional title appears near the top of the CV.':'Add a clear target job title near your name.');
+    const emailMatches=text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig)||[];
+    const phoneMatches=text.match(/\+?\d[\d\s().-]{7,}\d/g)||[];
+    const linkedinMatches=text.match(/linkedin\.com\/in\/[A-Za-z0-9_-]+/ig)||[];
+    const locationHit=/\b(basra|baghdad|iraq|dubai|abu dhabi|doha|qatar|kuwait|saudi|riyadh|oman|muscat|البصرة|بغداد|العراق)\b/i.test(text);
+    let contact=0;
+    contact+=emailMatches.length?3.5:0;
+    contact+=phoneMatches.length?3:0;
+    contact+=locationHit?1.5:0;
+    contact+=linkedinMatches.length?2:0;
+    add(contact,10,'Contact details',
+      Math.round(contact*10)/10+'/10 from email, phone, location and LinkedIn readability.');
+
+    const top=text.slice(0,1400);
+    const rolePattern=/\b(supervisor|engineer|inspector|technician|coordinator|manager|specialist|foreman|lead|mechanical|piping|welding|commissioning|qa\/?qc|quality|planner|construction|maintenance)\b/gi;
+    const topRoleHits=unique(top.match(rolePattern)||[]).length;
+    const titlePts=clamp(topRoleHits*1.7,0,5);
+    add(titlePts,5,'Professional title',
+      topRoleHits+' distinct role/title keyword(s) detected near the top of the CV.');
 
     const summaryHeading=/\b(professional summary|summary|profile|career objective|objective|about me)\b/i.test(text);
-    const intro=text.slice(0,2200);
-    const introWords=intro.split(/\s+/).filter(Boolean).length;
-    let summaryPts=summaryHeading?8:(introWords>=60?5:2);
-    if(summaryHeading && introWords>=80)summaryPts=10;
+    const summaryStart=text.search(/\b(professional summary|summary|profile|career objective|objective|about me)\b/i);
+    let summaryChunk=summaryStart>=0?text.slice(summaryStart,summaryStart+1600):text.slice(0,1400);
+    const summaryWords=summaryChunk.split(/\s+/).filter(Boolean).length;
+    let summaryPts=summaryHeading?3:0;
+    summaryPts+=clamp(summaryWords/10,0,7);
+    if(summaryWords>140)summaryPts-=clamp((summaryWords-140)/35,0,2);
     add(summaryPts,10,'Professional summary',
-      summaryHeading?'Summary/Profile section detected.':'No clear Summary/Profile heading detected; ATS readability improves with a dedicated summary section.');
+      (summaryHeading?'Summary/Profile heading found. ':'No dedicated Summary/Profile heading. ')+summaryWords+' nearby words detected.');
 
     const expHeading=/\b(work experience|professional experience|employment history|experience)\b/i.test(text);
-    const dateHits=(text.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\b|\b20\d{2}\b/gi)||[]).length;
-    const roleHits=(text.match(/\b(supervisor|engineer|inspector|technician|coordinator|manager|foreman|lead)\b/gi)||[]).length;
-    let expPts=0;
-    if(expHeading)expPts+=8;
-    expPts+=Math.min(6,Math.floor(dateHits/2)*2);
-    expPts+=Math.min(6,roleHits*2);
+    const dateHits=unique(text.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\b|\b20\d{2}\b/gi)||[]).length;
+    const roleHits=unique(text.match(/\b(supervisor|engineer|inspector|technician|coordinator|manager|foreman|lead|specialist)\b/gi)||[]).length;
+    const companyMarkers=(text.match(/\b(company|co\.|ltd|llc|spa|s\.p\.a|contractor|client|project)\b/gi)||[]).length;
+    let expPts=(expHeading?4:0)
+      +clamp(dateHits*0.8,0,6)
+      +clamp(roleHits*1.1,0,5)
+      +clamp(companyMarkers*0.45,0,5);
     add(expPts,20,'Experience structure',
-      expHeading?(dateHits+' date references and '+roleHits+' role-title references detected.'):'No clear Experience heading detected. Use a standard Experience section with company, role and dates.');
+      dateHits+' distinct date reference(s), '+roleHits+' role title(s), '+companyMarkers+' company/project marker(s).');
 
-    const actionMatches=(text.match(/\b(supervised|supervise|coordinated|coordinate|inspected|inspect|reviewed|review|performed|perform|managed|manage|led|lead|monitored|monitor|verified|verify|planned|plan|implemented|maintained|supported|troubleshot|prepared|ensured|conducted|executed|developed|controlled)\b/gi)||[]).length;
-    const bulletLike=(text.match(/[•●▪■\-]\s+/g)||[]).length;
-    let dutyPts=Math.min(15,Math.round(actionMatches*1.3 + Math.min(5,bulletLike)));
-    add(dutyPts,15,'Duties quality',
-      actionMatches+' action-oriented duty terms detected. Strong bullets should begin with clear action verbs.');
+    const actionPattern=/\b(supervised|supervise|coordinated|coordinate|inspected|inspect|reviewed|review|performed|perform|managed|manage|led|lead|monitored|monitor|verified|verify|planned|plan|implemented|implement|maintained|maintain|supported|support|troubleshot|troubleshoot|prepared|prepare|ensured|ensure|conducted|conduct|executed|execute|developed|develop|controlled|control|organized|organize|assessed|assess|installed|install|tested|test)\b/gi;
+    const actionMatches=text.match(actionPattern)||[];
+    const actionUnique=unique(actionMatches).length;
+    const bulletLike=(text.match(/[•●▪■►✓✔➤\-]\s+/g)||[]).length;
+    const quantified=(text.match(/\b\d+(?:\.\d+)?\s?(?:%|percent|hours?|days?|weeks?|months?|years?|km|m|mm|inch|inches|bar|psi|items?|systems?|lines?|people|manpower|workers?|projects?)\b/gi)||[]).length;
+    const dutyPts=
+      clamp(actionMatches.length*0.22,0,5)
+      +clamp(actionUnique*0.6,0,4)
+      +clamp(bulletLike*0.16,0,3)
+      +clamp(quantified*0.75,0,3);
+    add(dutyPts,15,'Duties & achievements',
+      actionMatches.length+' action-verb occurrence(s), '+bulletLike+' bullet marker(s), '+quantified+' quantified result/detail(s).');
 
     const skillsHeading=/\b(technical skills|core skills|skills|competencies|expertise)\b/i.test(text);
-    const techHits=(text.match(/\b(piping|commissioning|welding|ndt|asme|api|qa\/?qc|hydrotest|hydrotesting|flange|ptw|hse|autocad|mechanical|inspection|construction|maintenance|hvac|rt|ut|pt|mt|wps|pqr)\b/gi)||[]).length;
-    let skillsPts=(skillsHeading?4:0)+Math.min(6,Math.floor(techHits/2));
+    const techPattern=/\b(piping|commissioning|pre-commissioning|welding|ndt|asme|api|qa\/?qc|hydrotest|hydrotesting|flange|ptw|hse|autocad|mechanical|inspection|construction|maintenance|hvac|rt|ut|pt|mt|wps|pqr|rfi|ncr|itp|turnover|reinstatement|flushing|walkdown|p&id|isometric|simops|jha|jsa)\b/gi;
+    const techUnique=unique(text.match(techPattern)||[]);
+    let skillsPts=(skillsHeading?2.5:0)+clamp(techUnique.length*0.62,0,7.5);
     add(skillsPts,10,'Technical skills',
-      techHits+' technical keyword occurrences detected'+(skillsHeading?' with a Skills section.':'. Add a dedicated Skills section for better parsing.'));
+      techUnique.length+' distinct technical keyword(s)'+(skillsHeading?' with a dedicated Skills section.':'; add a Skills heading for clearer ATS parsing.'));
 
-    const educationHit=/\b(education|academic|university|college|bachelor|b\.sc|degree|diploma)\b/i.test(text);
-    const certHit=/\b(certification|certifications|certificate|cswip|asnt|osha|nebosh|api\s*\d|pmp)\b/i.test(text);
-    add((educationHit?4:0)+(certHit?4:0),8,'Education & certifications',
-      (educationHit?'Education detected. ':'Education section not clearly detected. ')+(certHit?'Certification content detected.':'Add a clear Certifications section if applicable.'));
+    const educationHeading=/\b(education|academic|university|college|bachelor|b\.sc|degree|diploma)\b/i.test(text);
+    const certHeading=/\b(certification|certifications|certificate|cswip|asnt|osha|nebosh|api\s*\d|pmp|iosh)\b/i.test(text);
+    const degreeHits=unique(text.match(/\b(bachelor|master|degree|diploma|b\.sc|m\.sc|university|college)\b/gi)||[]).length;
+    const certHits=unique(text.match(/\b(cswip|asnt|osha|nebosh|pmp|iosh|api\s*\d{3}|level\s*(?:ii|2|iii|3))\b/gi)||[]).length;
+    let backgroundPts=(educationHeading?2:0)+clamp(degreeHits*0.8,0,2)+(certHeading?2:0)+clamp(certHits*0.7,0,2);
+    add(backgroundPts,8,'Education & certifications',
+      degreeHits+' education keyword(s) and '+certHits+' certification keyword(s) detected.');
 
-    const langHit=/\b(languages|language|english|arabic|العربية|الانجليزية|الإنجليزية)\b/i.test(text);
-    add(langHit?4:0,4,'Languages',
-      langHit?'Language information detected.':'Add a Languages section with proficiency levels.');
+    const langHeading=/\b(languages|language)\b/i.test(text);
+    const langUnique=unique(text.match(/\b(english|arabic|french|german|spanish|turkish|persian|kurdish|العربية|الانجليزية|الإنجليزية)\b/gi)||[]).length;
+    const languagePts=clamp((langHeading?1.5:0)+langUnique*1.25,0,4);
+    add(languagePts,4,'Languages',
+      langUnique+' language(s) recognized'+(langHeading?' in/with a Languages section.':'.'));
 
     let lengthPts=0;
-    if(words>=250&&words<=1100)lengthPts=8;
-    else if(words>=180&&words<250)lengthPts=6;
-    else if(words>1100&&words<=1500)lengthPts=5;
-    else if(words>=100&&words<180)lengthPts=3;
-    add(lengthPts,8,'CV length',words+' words detected in the uploaded CV.');
+    if(words<100)lengthPts=words/100*2;
+    else if(words<220)lengthPts=2+(words-100)/120*4;
+    else if(words<=850)lengthPts=6+Math.min(2,(words-220)/315);
+    else if(words<=1200)lengthPts=8-(words-850)/350*2;
+    else if(words<=1600)lengthPts=6-(words-1200)/400*3;
+    else lengthPts=2;
+    add(lengthPts,8,'CV length',words+' words detected. The score changes gradually rather than by fixed buckets.');
+
+    const linesList=text.split(/\n+/).map(x=>norm(x)).filter(x=>x.length>35);
+    const duplicateCount=linesList.length-unique(linesList).length;
+    let qualityPenalty=clamp(duplicateCount*0.6,0,4);
 
     const jd=val('jobDescription');
     if(jd){
@@ -294,10 +328,16 @@ function runAts(){
       const keys=[...job].filter(k=>!stop.has(k)&&k.length>3);
       const hits=keys.filter(k=>cv.has(k));
       const match=keys.length?hits.length/keys.length:0;
-      add(Math.round(Math.min(10,match*18)),10,'Target-job keywords',
-        'Estimated keyword overlap with the job description: '+Math.round(match*100)+'%.');
+      const keywordPts=clamp(match*16,0,10);
+      add(keywordPts,10,'Target-job keywords',
+        'Estimated unique keyword overlap with the job description: '+Math.round(match*100)+'%.');
     }else{
-      add(5,10,'Target-job keywords','Paste a job description to evaluate targeted ATS keyword matching.');
+      add(4,10,'Target-job keywords','No job description supplied. Add one to earn up to 10 targeted-keyword points.');
+    }
+
+    if(qualityPenalty>0){
+      score-=qualityPenalty;
+      checks.push({ok:false,title:'Duplicate content',detail:duplicateCount+' repeated long line(s) detected; repetition reduces ATS clarity.',points:'-'+Math.round(qualityPenalty)});
     }
   } else {
     const dutyList=d.experience.flatMap(e=>e.duties||[]);
@@ -375,7 +415,8 @@ function runAts(){
 
   score=Math.max(0,Math.min(100,Math.round(score)));
   $('atsScore').textContent=score;
-  $('atsResults').innerHTML=checks.map(c=>'<div class="sas-check '+(c.ok?'good':'warn')+'"><b>'+(c.ok?'✓ ':'⚠ ')+esc(c.title)+' <span style="float:right">'+esc(c.points)+'</span></b><span class="muted">'+esc(c.detail)+'</span></div>').join('');
+  const sourceLabel=hasStructured?'Builder CV':'Uploaded CV';
+  $('atsResults').innerHTML='<div class="sas-check good"><b>Scoring source</b><span class="muted">'+sourceLabel+' • live score</span></div>'+checks.map(c=>'<div class="sas-check '+(c.ok?'good':'warn')+'"><b>'+(c.ok?'✓ ':'⚠ ')+esc(c.title)+' <span style="float:right">'+esc(c.points)+'</span></b><span class="muted">'+esc(c.detail)+'</span></div>').join('');
 }
 
 async function readPdf(file){
