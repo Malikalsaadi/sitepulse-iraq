@@ -204,10 +204,17 @@ function sourceText(){
 function keywordSet(s){return new Set(String(s||'').toLowerCase().match(/[a-z][a-z0-9+.#/-]{2,}|[\u0600-\u06ff]{3,}/g)||[])}
 function runAts(){
   const d=gatherData();
-  const text=sourceText().trim();
+  const imported=val('importedText').trim();
+  const structured=structuredCvText(d).trim();
+  const hasStructured=!!(
+    d.name||d.title||d.summary||d.experience.length||d.education.length||
+    d.certifications.length||d.skills.length||d.languages.length
+  );
+  const text=(hasStructured?structured:imported).trim();
+
   if(!text){
     $('atsScore').textContent='—';
-    $('atsResults').innerHTML='<p class="muted">Start filling the CV to see a live ATS score.</p>';
+    $('atsResults').innerHTML='<p class="muted">Start filling the CV or upload an old CV to see a live ATS score.</p>';
     return;
   }
 
@@ -220,79 +227,150 @@ function runAts(){
   };
 
   const words=text.split(/\s+/).filter(Boolean).length;
-  const dutyList=d.experience.flatMap(e=>e.duties||[]);
-  const uniqueDuties=new Set(dutyList.map(x=>x.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').trim()));
-  const actionVerb=/^(supervis|coordinat|inspect|review|perform|manage|lead|monitor|verify|plan|implement|maintain|support|troubleshoot|prepare|ensure|conduct|execute|develop|control|organize|assess)/i;
-  const strongDuties=dutyList.filter(x=>x.split(/\s+/).length>=7 && actionVerb.test(x.trim())).length;
+  const lower=text.toLowerCase();
 
-  let contact=0;
-  if(d.email && /@/.test(d.email))contact+=4;
-  if(d.phone && /\+?\d[\d\s()-]{7,}/.test(d.phone))contact+=4;
-  if(d.location)contact+=2;
-  add(contact,10,'Contact details',contact===10?'Email, phone and location are complete.':'Complete email, phone and location for stronger parsing.');
+  if(!hasStructured){
+    const hasEmail=/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text);
+    const hasPhone=/\+?\d[\d\s().-]{7,}\d/.test(text);
+    const locationHit=/\b(basra|baghdad|iraq|dubai|abu dhabi|doha|qatar|kuwait|saudi|riyadh|oman|muscat|البصرة|بغداد|العراق)\b/i.test(text);
+    let contact=(hasEmail?4:0)+(hasPhone?4:0)+(locationHit?2:0);
+    add(contact,10,'Contact details',
+      contact>=8?'Email and phone are readable in the uploaded CV.':'Make email, phone and location clearly visible in plain text.');
 
-  add(d.title?5:0,5,'Professional title',d.title?'Clear professional title detected.':'Add a clear target professional title.');
+    const titleHit=/\b(supervisor|engineer|inspector|technician|coordinator|manager|specialist|foreman|lead|mechanical|piping|welding|commissioning|qa\/?qc|quality)\b/i.test(text.slice(0,1200));
+    add(titleHit?5:0,5,'Professional title',
+      titleHit?'A recognizable professional title appears near the top of the CV.':'Add a clear target job title near your name.');
 
-  const summaryWords=d.summary.split(/\s+/).filter(Boolean).length;
-  let summaryPts=0;
-  if(summaryWords>=25)summaryPts=5;
-  if(summaryWords>=40&&summaryWords<=120)summaryPts=10;
-  else if(summaryWords>120)summaryPts=7;
-  add(summaryPts,10,'Professional summary',summaryWords?summaryWords+' words in the summary. Aim for roughly 40–120 focused words.':'Add a concise professional summary.');
+    const summaryHeading=/\b(professional summary|summary|profile|career objective|objective|about me)\b/i.test(text);
+    const intro=text.slice(0,2200);
+    const introWords=intro.split(/\s+/).filter(Boolean).length;
+    let summaryPts=summaryHeading?8:(introWords>=60?5:2);
+    if(summaryHeading && introWords>=80)summaryPts=10;
+    add(summaryPts,10,'Professional summary',
+      summaryHeading?'Summary/Profile section detected.':'No clear Summary/Profile heading detected; ATS readability improves with a dedicated summary section.');
 
-  let expPts=0;
-  if(d.experience.length)expPts+=6;
-  if(d.experience.length){
-    const completeness=d.experience.map(e=>{
-      let p=0;
-      if(e.role)p+=1;
-      if(e.company)p+=1;
-      if(e.project)p+=.5;
-      if(e.from&&(e.to||e.current))p+=1;
-      if((e.duties||[]).length>=3)p+=1.5;
-      return p/5;
-    });
-    expPts+=Math.round((completeness.reduce((a,b)=>a+b,0)/completeness.length)*14);
-  }
-  add(expPts,20,'Experience structure',d.experience.length?d.experience.length+' structured role(s). Include title, company, dates and at least 3 duties per role.':'Add at least one structured experience entry.');
+    const expHeading=/\b(work experience|professional experience|employment history|experience)\b/i.test(text);
+    const dateHits=(text.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{4}\b|\b20\d{2}\b/gi)||[]).length;
+    const roleHits=(text.match(/\b(supervisor|engineer|inspector|technician|coordinator|manager|foreman|lead)\b/gi)||[]).length;
+    let expPts=0;
+    if(expHeading)expPts+=8;
+    expPts+=Math.min(6,Math.floor(dateHits/2)*2);
+    expPts+=Math.min(6,roleHits*2);
+    add(expPts,20,'Experience structure',
+      expHeading?(dateHits+' date references and '+roleHits+' role-title references detected.'):'No clear Experience heading detected. Use a standard Experience section with company, role and dates.');
 
-  let dutyPts=0;
-  if(dutyList.length>=3)dutyPts=5;
-  if(dutyList.length>=6)dutyPts=9;
-  if(dutyList.length>=10)dutyPts=11;
-  const qualityRatio=dutyList.length?strongDuties/dutyList.length:0;
-  dutyPts+=Math.round(qualityRatio*4);
-  if(uniqueDuties.size<dutyList.length && dutyList.length)dutyPts=Math.max(0,dutyPts-2);
-  add(dutyPts,15,'Duties quality',dutyList.length?dutyList.length+' duties; '+strongDuties+' use strong action-led professional phrasing.':'Add concise responsibility/achievement bullets.');
+    const actionMatches=(text.match(/\b(supervised|supervise|coordinated|coordinate|inspected|inspect|reviewed|review|performed|perform|managed|manage|led|lead|monitored|monitor|verified|verify|planned|plan|implemented|maintained|supported|troubleshot|prepared|ensured|conducted|executed|developed|controlled)\b/gi)||[]).length;
+    const bulletLike=(text.match(/[•●▪■\-]\s+/g)||[]).length;
+    let dutyPts=Math.min(15,Math.round(actionMatches*1.3 + Math.min(5,bulletLike)));
+    add(dutyPts,15,'Duties quality',
+      actionMatches+' action-oriented duty terms detected. Strong bullets should begin with clear action verbs.');
 
-  let skillsPts=Math.min(10,Math.round(d.skills.length*1.25));
-  add(skillsPts,10,'Technical skills',d.skills.length+' skill(s). Around 8–12 relevant skills is a strong range.');
+    const skillsHeading=/\b(technical skills|core skills|skills|competencies|expertise)\b/i.test(text);
+    const techHits=(text.match(/\b(piping|commissioning|welding|ndt|asme|api|qa\/?qc|hydrotest|hydrotesting|flange|ptw|hse|autocad|mechanical|inspection|construction|maintenance|hvac|rt|ut|pt|mt|wps|pqr)\b/gi)||[]).length;
+    let skillsPts=(skillsHeading?4:0)+Math.min(6,Math.floor(techHits/2));
+    add(skillsPts,10,'Technical skills',
+      techHits+' technical keyword occurrences detected'+(skillsHeading?' with a Skills section.':'. Add a dedicated Skills section for better parsing.'));
 
-  let backgroundPts=0;
-  if(d.education.length)backgroundPts+=4;
-  if(d.certifications.length)backgroundPts+=4;
-  add(backgroundPts,8,'Education & certifications',(d.education.length?'Education included. ':'Add education. ')+(d.certifications.length?'Certifications included.':'Add relevant certifications if applicable.'));
+    const educationHit=/\b(education|academic|university|college|bachelor|b\.sc|degree|diploma)\b/i.test(text);
+    const certHit=/\b(certification|certifications|certificate|cswip|asnt|osha|nebosh|api\s*\d|pmp)\b/i.test(text);
+    add((educationHit?4:0)+(certHit?4:0),8,'Education & certifications',
+      (educationHit?'Education detected. ':'Education section not clearly detected. ')+(certHit?'Certification content detected.':'Add a clear Certifications section if applicable.'));
 
-  add(d.languages.length?4:0,4,'Languages',d.languages.length?d.languages.length+' language(s) listed with proficiency.':'Add languages and proficiency levels.');
+    const langHit=/\b(languages|language|english|arabic|العربية|الانجليزية|الإنجليزية)\b/i.test(text);
+    add(langHit?4:0,4,'Languages',
+      langHit?'Language information detected.':'Add a Languages section with proficiency levels.');
 
-  let lengthPts=0;
-  if(words>=250&&words<=1000)lengthPts=8;
-  else if(words>=180&&words<250)lengthPts=5;
-  else if(words>1000&&words<=1400)lengthPts=5;
-  else if(words>=100&&words<180)lengthPts=3;
-  add(lengthPts,8,'CV length',words+' words in the current CV content.');
+    let lengthPts=0;
+    if(words>=250&&words<=1100)lengthPts=8;
+    else if(words>=180&&words<250)lengthPts=6;
+    else if(words>1100&&words<=1500)lengthPts=5;
+    else if(words>=100&&words<180)lengthPts=3;
+    add(lengthPts,8,'CV length',words+' words detected in the uploaded CV.');
 
-  const jd=val('jobDescription');
-  if(jd){
-    const cv=keywordSet(text),job=keywordSet(jd);
-    const stop=new Set(['the','and','with','for','this','that','from','your','you','are','our','have','will','job','role','work','all','into','who','requirements','responsibilities','experience','skills']);
-    const keys=[...job].filter(k=>!stop.has(k)&&k.length>3);
-    const hits=keys.filter(k=>cv.has(k));
-    const match=keys.length?hits.length/keys.length:0;
-    const keywordPts=Math.round(Math.min(10,match*18));
-    add(keywordPts,10,'Target-job keywords','Estimated relevant keyword overlap: '+Math.round(match*100)+'%. Use only keywords supported by your real experience.');
-  }else{
-    add(5,10,'Target-job keywords','No job description supplied. Paste one to unlock the full 10 points for job targeting.');
+    const jd=val('jobDescription');
+    if(jd){
+      const cv=keywordSet(text),job=keywordSet(jd);
+      const stop=new Set(['the','and','with','for','this','that','from','your','you','are','our','have','will','job','role','work','all','into','who','requirements','responsibilities','experience','skills']);
+      const keys=[...job].filter(k=>!stop.has(k)&&k.length>3);
+      const hits=keys.filter(k=>cv.has(k));
+      const match=keys.length?hits.length/keys.length:0;
+      add(Math.round(Math.min(10,match*18)),10,'Target-job keywords',
+        'Estimated keyword overlap with the job description: '+Math.round(match*100)+'%.');
+    }else{
+      add(5,10,'Target-job keywords','Paste a job description to evaluate targeted ATS keyword matching.');
+    }
+  } else {
+    const dutyList=d.experience.flatMap(e=>e.duties||[]);
+    const uniqueDuties=new Set(dutyList.map(x=>x.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').trim()));
+    const actionVerb=/^(supervis|coordinat|inspect|review|perform|manage|lead|monitor|verify|plan|implement|maintain|support|troubleshoot|prepare|ensure|conduct|execute|develop|control|organize|assess)/i;
+    const strongDuties=dutyList.filter(x=>x.split(/\s+/).length>=7 && actionVerb.test(x.trim())).length;
+
+    let contact=0;
+    if(d.email && /@/.test(d.email))contact+=4;
+    if(d.phone && /\+?\d[\d\s()-]{7,}/.test(d.phone))contact+=4;
+    if(d.location)contact+=2;
+    add(contact,10,'Contact details',contact===10?'Email, phone and location are complete.':'Complete email, phone and location for stronger parsing.');
+
+    add(d.title?5:0,5,'Professional title',d.title?'Clear professional title detected.':'Add a clear target professional title.');
+
+    const summaryWords=d.summary.split(/\s+/).filter(Boolean).length;
+    let summaryPts=0;
+    if(summaryWords>=25)summaryPts=5;
+    if(summaryWords>=40&&summaryWords<=120)summaryPts=10;
+    else if(summaryWords>120)summaryPts=7;
+    add(summaryPts,10,'Professional summary',summaryWords?summaryWords+' words in the summary. Aim for roughly 40–120 focused words.':'Add a concise professional summary.');
+
+    let expPts=0;
+    if(d.experience.length)expPts+=6;
+    if(d.experience.length){
+      const completeness=d.experience.map(e=>{
+        let p=0;
+        if(e.role)p+=1;
+        if(e.company)p+=1;
+        if(e.project)p+=.5;
+        if(e.from&&(e.to||e.current))p+=1;
+        if((e.duties||[]).length>=3)p+=1.5;
+        return p/5;
+      });
+      expPts+=Math.round((completeness.reduce((a,b)=>a+b,0)/completeness.length)*14);
+    }
+    add(expPts,20,'Experience structure',d.experience.length?d.experience.length+' structured role(s). Include title, company, dates and at least 3 duties per role.':'Add at least one structured experience entry.');
+
+    let dutyPts=0;
+    if(dutyList.length>=3)dutyPts=5;
+    if(dutyList.length>=6)dutyPts=9;
+    if(dutyList.length>=10)dutyPts=11;
+    dutyPts+=Math.round((dutyList.length?strongDuties/dutyList.length:0)*4);
+    if(uniqueDuties.size<dutyList.length&&dutyList.length)dutyPts=Math.max(0,dutyPts-2);
+    add(dutyPts,15,'Duties quality',dutyList.length?dutyList.length+' duties; '+strongDuties+' use strong action-led professional phrasing.':'Add concise responsibility/achievement bullets.');
+
+    add(Math.min(10,Math.round(d.skills.length*1.25)),10,'Technical skills',d.skills.length+' skill(s). Around 8–12 relevant skills is a strong range.');
+
+    let backgroundPts=0;
+    if(d.education.length)backgroundPts+=4;
+    if(d.certifications.length)backgroundPts+=4;
+    add(backgroundPts,8,'Education & certifications',(d.education.length?'Education included. ':'Add education. ')+(d.certifications.length?'Certifications included.':'Add relevant certifications if applicable.'));
+
+    add(d.languages.length?4:0,4,'Languages',d.languages.length?d.languages.length+' language(s) listed with proficiency.':'Add languages and proficiency levels.');
+
+    let lengthPts=0;
+    if(words>=250&&words<=1000)lengthPts=8;
+    else if(words>=180&&words<250)lengthPts=5;
+    else if(words>1000&&words<=1400)lengthPts=5;
+    else if(words>=100&&words<180)lengthPts=3;
+    add(lengthPts,8,'CV length',words+' words in the current CV content.');
+
+    const jd=val('jobDescription');
+    if(jd){
+      const cv=keywordSet(text),job=keywordSet(jd);
+      const stop=new Set(['the','and','with','for','this','that','from','your','you','are','our','have','will','job','role','work','all','into','who','requirements','responsibilities','experience','skills']);
+      const keys=[...job].filter(k=>!stop.has(k)&&k.length>3);
+      const hits=keys.filter(k=>cv.has(k));
+      const match=keys.length?hits.length/keys.length:0;
+      add(Math.round(Math.min(10,match*18)),10,'Target-job keywords','Estimated relevant keyword overlap: '+Math.round(match*100)+'%. Use only keywords supported by your real experience.');
+    }else{
+      add(5,10,'Target-job keywords','No job description supplied. Paste one to unlock the full 10 points for job targeting.');
+    }
   }
 
   score=Math.max(0,Math.min(100,Math.round(score)));
