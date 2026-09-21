@@ -86,6 +86,12 @@ function suggestionSet(role){
   return DUTIES.general;
 }
 
+function updateDutySuggestions(exp,card){
+  const box=card?.querySelector('.suggestions'); if(!box)return;
+  const suggestions=suggestionSet(exp.role).filter(x=>!exp.duties.includes(x)).slice(0,6);
+  box.innerHTML=suggestions.map((s,si)=>'<button type="button" data-action="suggest-duty" data-suggestion="'+si+'">'+esc(s)+'</button>').join('');
+}
+
 function renderExperiences(){
   $('experienceList').innerHTML=experiences.map((e,i)=>{
     const suggestions=suggestionSet(e.role).filter(x=>!e.duties.includes(x)).slice(0,6);
@@ -267,7 +273,12 @@ function copyText(){
 
 $('experienceList').addEventListener('input',e=>{
   const card=e.target.closest('.exp-card');if(!card)return;const exp=experiences.find(x=>x.id===card.dataset.eid);if(!exp)return;
-  const f=e.target.dataset.field;if(f&&f!=='current'){exp[f]=e.target.value;if(f==='role')renderExperiences();else buildPreview()}
+  const f=e.target.dataset.field;
+  if(f&&f!=='current'){
+    exp[f]=e.target.value;
+    if(f==='role')updateDutySuggestions(exp,card);
+    buildPreview();
+  }
 });
 $('experienceList').addEventListener('change',e=>{
   const card=e.target.closest('.exp-card');if(!card)return;const exp=experiences.find(x=>x.id===card.dataset.eid);if(!exp)return;
