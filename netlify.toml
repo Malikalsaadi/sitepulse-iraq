@@ -1,5 +1,5 @@
 [build]
-  command = "mkdir -p dist && cp index.html analytics.html app.js styles.css feedback.js analytics.js analytics-admin.js daily-report.html daily-report.css daily-report.js daily-pdf-buttons.js cloud.js dist/"
+  command = "mkdir -p dist && cp index.html analytics.html app.js styles.css feedback.js analytics.js analytics-admin.js daily-report.html daily-report.css daily-report.js daily-pdf-buttons.js cloud.js sas.html sas.css sas.js dist/"
   publish = "dist"
   functions = "netlify/functions"
 
